@@ -36,16 +36,11 @@ void app_main(void)
         int length = 0;
         ESP_ERROR_CHECK(uart_get_buffered_data_len(uart_num, (size_t *)&length));
         length = uart_read_bytes(uart_num, data, length, pdMS_TO_TICKS(1000));
-        if (length > 0) {
+        if (length > 0)
+        {
             // Echo back the received data
             uart_write_bytes(uart_num, (const char *)data, length);
         }
-
-        // Write data to UART.
-        // char *test_str = "This is a test string.\n";
-        // uart_write_bytes(uart_num, (const char *)test_str, strlen(test_str));
         vTaskDelay(pdMS_TO_TICKS(1000));
-
-        
     }
 }
