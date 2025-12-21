@@ -6,6 +6,11 @@
 #include "driver/uart.h"
 #include "esp_err.h"
 
+#define CR 0x0D
+#define LF 0x0A
+#define wait_time_out 300 // milliseconds
+#define loop_delay 5000   // milliseconds
+
 void app_main(void)
 {
     const uart_port_t uart_num = UART_NUM_0;
@@ -31,16 +36,24 @@ void app_main(void)
 
     while (1)
     {
+        const uint8_t IDRequestMsg[] = {'/', '?', '!', CR, LF};
+
+        uart_write_bytes(uart_num, (const char *)IDRequestMsg, sizeof(IDRequestMsg));
+
         // Read data from UART.
         uint8_t data[128];
-        int length = 0;
-        ESP_ERROR_CHECK(uart_get_buffered_data_len(uart_num, (size_t *)&length));
-        length = uart_read_bytes(uart_num, data, length, pdMS_TO_TICKS(1000));
+
+        int length = uart_read_bytes(uart_num, data, sizeof(data), pdMS_TO_TICKS(wait_time_out));
+        uint8_t IDResponse_expicted[10] = {'/', 'M', '0', '4', '1', '5', '2', '2', CR, LF}; // hardcoded response
+
         if (length > 0)
         {
-            // Echo back the received data
-            uart_write_bytes(uart_num, (const char *)data, length);
+            if (strncmp((const char *)data, (const char *)IDResponse_expicted, length) == 0)
+            {
+                // blink LED or indicate success
+            }
         }
-        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        vTaskDelay(pdMS_TO_TICKS(loop_delay));
     }
 }
