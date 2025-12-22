@@ -10,7 +10,8 @@
 #define CR 0x0D
 #define LF 0x0A
 #define wait_time_out 300 // milliseconds
-#define loop_delay 5000   // milliseconds
+#define loop_delay 10     // milliseconds
+#define BOOT_BTN GPIO_NUM_0
 
 #define RGB_LED_GPIO 48 // change if your board is different
 #define LED_STRIP_LED_NUM 1
@@ -49,6 +50,10 @@ void led_blink(void)
 }
 void app_main(void)
 {
+
+    gpio_set_direction(BOOT_BTN, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(BOOT_BTN, GPIO_PULLUP_ONLY);
+
     const uart_port_t uart_num = UART_NUM_0;
     led_setup();
     // Setup UART buffered IO with event queue
@@ -70,23 +75,29 @@ void app_main(void)
     // Set UART pins(TX: IO4, RX: IO5, RTS: IO18, CTS: IO19)
     ESP_ERROR_CHECK(uart_set_pin(uart_num, 43, 44, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
+    const uint8_t IDRequestMsg[] = {'/', '?', '!', CR, LF};
+    const uint8_t IDResponse_expicted[10] = {'/', 'M', '0', '4', '1', '5', '2', '2', CR, LF}; // hardcoded response
+
     while (1)
     {
-        const uint8_t IDRequestMsg[] = {'/', '?', '!', CR, LF};
 
-        uart_write_bytes(uart_num, (const char *)IDRequestMsg, sizeof(IDRequestMsg));
-
-        // Read data from UART.
-        uint8_t data[128];
-
-        int length = uart_read_bytes(uart_num, data, sizeof(data), pdMS_TO_TICKS(wait_time_out));
-        uint8_t IDResponse_expicted[10] = {'/', 'M', '0', '4', '1', '5', '2', '2', CR, LF}; // hardcoded response
-
-        if (length > 0)
+        int val = gpio_get_level(BOOT_BTN);
+        if (val == 0)
         {
-            if (strncmp((const char *)data, (const char *)IDResponse_expicted, length) == 0)
+
+            uart_write_bytes(uart_num, (const char *)IDRequestMsg, sizeof(IDRequestMsg));
+
+            // Read data from UART.
+            uint8_t data[128];
+
+            int length = uart_read_bytes(uart_num, data, sizeof(data), pdMS_TO_TICKS(wait_time_out));
+
+            if (length > 0)
             {
-                led_blink();
+                if (strncmp((const char *)data, (const char *)IDResponse_expicted, length) == 0)
+                {
+                    led_blink();
+                }
             }
         }
 
