@@ -59,8 +59,8 @@ void app_main(void)
 
     uart_config_t uart_config = {
         .baud_rate = 2400,
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
+        .data_bits = UART_DATA_7_BITS,
+        .parity = UART_PARITY_EVEN,
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
     };
