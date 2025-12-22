@@ -58,7 +58,7 @@ void app_main(void)
     ESP_ERROR_CHECK(uart_driver_install(uart_num, uart_buffer_size, uart_buffer_size, 0, NULL, 0));
 
     uart_config_t uart_config = {
-        .baud_rate = 115200,
+        .baud_rate = 2400,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
