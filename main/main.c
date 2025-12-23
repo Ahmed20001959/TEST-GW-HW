@@ -77,11 +77,17 @@ void push_button_detect(void)
     {
         uint8_t data[128];
         int val = gpio_get_level(BOOT_BTN);
-        if (val == 0)
+        int last_state = 1;
+        if (val == 0 && last_state == 1)
         {
-            xQueueSend(queue_handler, data, portMAX_DELAY);
+            vTaskDelay(pdMS_TO_TICKS(50));
+            if (gpio_get_level(BOOT_BTN) == 0)
+            {
+                xQueueSend(queue_handler, data, portMAX_DELAY);
+            }
+            last_state = val;
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
-        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
