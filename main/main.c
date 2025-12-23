@@ -10,7 +10,7 @@
 
 #define CR 0x0D
 #define LF 0x0A
-#define wait_time_out 1000 // milliseconds
+#define wait_time_out 5000 // milliseconds
 #define loop_delay 10      // milliseconds
 #define BOOT_BTN GPIO_NUM_0
 
@@ -81,8 +81,8 @@ void push_button_detect(void)
         {
             xQueueSend(queue_handler, data, portMAX_DELAY);
         }
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
-    vTaskDelay(pdMS_TO_TICKS(10));
 }
 
 // Function to receive UART data and blink LED on expected response
@@ -93,20 +93,23 @@ void recive_uart_data(void)
     const uint8_t IDRequestMsg[] = {'/', '?', '!', CR, LF};
     const uint8_t IDResponse_expicted[10] = {'/', 'M', '0', '4', '1', '5', '2', '2', CR, LF}; // hardcoded response
 
-    if (xQueueReceive(queue_handler, data, portMAX_DELAY) == pdPASS)
+    while (1)
     {
-        uart_write_bytes(uart_num, (const char *)IDRequestMsg, sizeof(IDRequestMsg));
-
-        // Read data from UART.
-        uint8_t UART_DATA[128];
-
-        int length = uart_read_bytes(uart_num, UART_DATA, sizeof(UART_DATA), pdMS_TO_TICKS(wait_time_out));
-
-        if (length > 0)
+        if (xQueueReceive(queue_handler, data, portMAX_DELAY) == pdPASS)
         {
-            if (strncmp((const char *)UART_DATA, (const char *)IDResponse_expicted, length) == 0)
+            uart_write_bytes(uart_num, (const char *)IDRequestMsg, sizeof(IDRequestMsg));
+
+            // Read data from UART.
+            uint8_t UART_DATA[128];
+
+            int length = uart_read_bytes(uart_num, UART_DATA, sizeof(UART_DATA), pdMS_TO_TICKS(wait_time_out));
+
+            if (length > 0)
             {
-                led_blink();
+                if (strncmp((const char *)UART_DATA, (const char *)IDResponse_expicted, length) == 0)
+                {
+                    led_blink();
+                }
             }
         }
     }
