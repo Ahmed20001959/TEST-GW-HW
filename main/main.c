@@ -73,21 +73,36 @@ void led_setup(void)
 // Function to detect push button press and send UART request
 void push_button_detect(void)
 {
+    int counter = 0;
+    bool is_clicked = false;
+    uint8_t data[128];
+
     while (1)
     {
-        uint8_t data[128];
-        // int val = gpio_get_level(BOOT_BTN);
-        // int last_state = 1;
-        // if (val == 0 && last_state == 1)
+        int level = gpio_get_level(BOOT_BTN);
+
+        if (level == 0)
         {
-            // vTaskDelay(pdMS_TO_TICKS(50));
-            if (gpio_get_level(BOOT_BTN) == 0)
+            if (!is_clicked)
+            {
+                is_clicked = true;
+            }
             {
                 xQueueSend(queue_handler, data, portMAX_DELAY);
+                is_clicked = true;
             }
-            // last_state = val;
+            else
+            {
+                counter++;
+            }
         }
-        vTaskDelay(pdMS_TO_TICKS(150));
+        if (counter >= 15)
+        {
+            is_clicked = false;
+            counter = 0;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
