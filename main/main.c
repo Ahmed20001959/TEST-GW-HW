@@ -7,6 +7,7 @@
 #include "esp_err.h"
 #include "led_strip.h"
 #include "esp_task_wdt.h"
+#include "esp_intr_alloc.h"
 
 #define CR 0x0D
 #define LF 0x0A
@@ -17,7 +18,7 @@
 #define RGB_LED_GPIO 48 // change if your board is different
 #define LED_STRIP_LED_NUM 1
 led_strip_handle_t led_strip;
-QueueHandle_t queue_handler;
+TaskHandle_t request_task_handle = NULL;
 const uint8_t uart_num = UART_NUM_0;
 
 void led_blink(void);
@@ -25,6 +26,17 @@ void uart_setup(void);
 void led_setup(void);
 void push_button_detect(void);
 void recive_uart_data(void);
+
+/* ISR */
+static void IRAM_ATTR boot_isr_handler(void *arg)
+{
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    vTaskNotifyGiveFromISR(request_task_handle, &xHigherPriorityTaskWoken);
+
+    if (xHigherPriorityTaskWoken)
+        portYIELD_FROM_ISR();
+}
 
 // UART configuration
 void uart_setup(void)
@@ -70,59 +82,25 @@ void led_setup(void)
         led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
 }
 
-// Function to detect push button press and send UART request
-void push_button_detect(void)
-{
-    int counter = 0;
-    bool is_clicked = false;
-    uint8_t data[128];
-
-    while (1)
-    {
-        int level = gpio_get_level(BOOT_BTN);
-
-        if (level == 0)
-        {
-            if (!is_clicked)
-            {
-                is_clicked = true;
-            }
-            {
-                xQueueSend(queue_handler, data, portMAX_DELAY);
-                is_clicked = true;
-            }
-            else
-            {
-                counter++;
-            }
-        }
-        if (counter >= 15)
-        {
-            is_clicked = false;
-            counter = 0;
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-}
-
-// Function to receive UART data and blink LED on expected response
+// receive UART data and blink LED on expected response
 void recive_uart_data(void)
 {
-    // Read data from UART.
-    uint8_t data[128];
+
     const uint8_t IDRequestMsg[] = {'/', '?', '!', CR, LF};
     const uint8_t IDResponse_expicted[10] = {'/', 'M', '0', '4', '1', '5', '2', '2', CR, LF}; // hardcoded response
-
+    static uint32_t last_tick = 0;
     while (1)
     {
-        if (xQueueReceive(queue_handler, data, portMAX_DELAY) == pdPASS)
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        uint32_t now = xTaskGetTickCount();
+        if ((now - last_tick) > pdMS_TO_TICKS(50))
         {
             uart_write_bytes(uart_num, (const char *)IDRequestMsg, sizeof(IDRequestMsg));
 
             // Read data from UART.
             uint8_t UART_DATA[128];
 
+            // Read data from UART.
             int length = uart_read_bytes(uart_num, UART_DATA, sizeof(UART_DATA), pdMS_TO_TICKS(wait_time_out));
 
             if (length > 0)
@@ -132,11 +110,12 @@ void recive_uart_data(void)
                     led_blink();
                 }
             }
+            last_tick = now;
         }
     }
 }
 
-// Function to blink LED
+// blink LED
 void led_blink(void)
 {
     // WHITE
@@ -151,8 +130,12 @@ void led_blink(void)
 
 void button_setup(void)
 {
-    gpio_set_direction(BOOT_BTN, GPIO_MODE_INPUT);
-    gpio_set_pull_mode(BOOT_BTN, GPIO_PULLUP_ONLY);
+    gpio_config_t btn_conf = {
+        .pin_bit_mask = (1ULL << BOOT_BTN),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .intr_type = GPIO_INTR_NEGEDGE};
+    gpio_config(&btn_conf);
 }
 
 void app_main(void)
@@ -160,10 +143,12 @@ void app_main(void)
     led_setup();
     uart_setup();
     button_setup();
-    queue_handler = xQueueCreate(10, 100);
+
+    gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
+    gpio_isr_handler_add(BOOT_BTN, boot_isr_handler, NULL);
+
     esp_task_wdt_deinit();
-    xTaskCreate(push_button_detect, "push_button_detect", 2048, NULL, 4, NULL);
-    xTaskCreate(recive_uart_data, "recive_uart_data", 2048, NULL, 5, NULL);
+    xTaskCreate(recive_uart_data, "recive_uart_data", 2048, NULL, 5, &request_task_handle);
 
     while (1)
     {
