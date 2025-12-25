@@ -93,7 +93,7 @@ void recive_uart_data(void)
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         uint32_t now = xTaskGetTickCount();
-        if ((now - last_tick) > pdMS_TO_TICKS(50))
+        if ((now - last_tick) > pdMS_TO_TICKS(150))
         {
             uart_write_bytes(uart_num, (const char *)IDRequestMsg, sizeof(IDRequestMsg));
 
